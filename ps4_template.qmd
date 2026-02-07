@@ -1,7 +1,7 @@
 ---
-title: "title"
-author: "author"
-date: "date"
+title: "HW 4"
+author: "SONGYI"
+date: "2/6"
 format: 
   pdf:
     include-in-header: 
@@ -61,7 +61,43 @@ alt.renderers.enable("png")
 
 ## Step 1: Develop initial scraper and crawler
 
+response = requests.get(url)
+soup = BeautifulSoup(response.text, "lxml")
 
+# 3)  enforcement action
+cards = soup.find_all("li", class_="usa-card")
+
+print(f" {len(cards)}  enforcement actions")
+
+# 4) 
+data = []
+
+for card in cards:
+    # title + link
+    h2_tag = card.find("h2")
+    a_tag = h2_tag.find("a")
+    title = a_tag.text.strip()
+    link = base_url + a_tag["href"]
+
+    # date
+    span_tag = card.find("span")
+    date = span_tag.text.strip()
+
+    cat_tags = card.find_all("li", class_="usa-tag")
+    category = cat_tags[0].text.strip() if cat_tags else None
+
+    data.append({
+        "title": title,
+        "date": date,
+        "category": category,
+        "link": link
+    })
+
+# 5)  dataframe
+df = pd.DataFrame(data)
+
+# 6) 
+print(df.head())
 ```{python}
 
 ```
@@ -71,16 +107,181 @@ alt.renderers.enable("png")
 ### 1. Turning the scraper into a function 
 
 * a. Pseudo-Code
+A: Define a function that takes a starting year and month as inputs
+
+B: If the year is earlier than 2013, print a message and exit the function
+
+C: Initialize an empty list to store enforcement actions
+
+D: Start from page 1 and loop through pages using a while loop
+
+E: For each page:
+
+    1. Construct the URL with the page number
+
+    2. Request the webpage and parse the HTML
+
+    3. Extract title, date, category, and link for each enforcement action
+
+    4. Append results to the list
+
+    5. Check the oldest date on the page
+
+    6. If the date is earlier than the starting date, stop looping
+
+    7. Pause for 1 second before requesting the next page
+
+F: Convert the collected data into a dataframe
+
+G: Save the dataframe as a CSV file and return it
 
 
 * b. Create Dynamic Scraper
+def scrape_enforcement_actions(start_year, start_month, RUN_SCRAPER=False):
+    """
+    Scrape HHS OIG enforcement actions from a given start year/month to today.
+    Step 2b version: does NOT save CSV yet.
+    """
 
+    # ---- 安全开关 ----
+    if not RUN_SCRAPER:
+        print("RUN_SCRAPER is False. Skipping web scraping.")
+        return None
+
+    # ---- 年份检查 ----
+    if start_year < 2013:
+        print("Error: Enforcement Actions are only available from 2013 onward.")
+        return None
+
+    base_url = "https://oig.hhs.gov"
+    data = []
+
+    start_date = datetime(start_year, start_month, 1)
+
+    page = 1
+    keep_scraping = True
+
+    while keep_scraping:
+        print(f"Scraping page {page}...")
+
+        url = f"https://oig.hhs.gov/fraud/enforcement/?page={page}"
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, "lxml")
+
+        cards = soup.find_all("li", class_="usa-card")
+
+        if len(cards) == 0:
+            break
+
+        for card in cards:
+            a_tag = card.find("h2").find("a")
+            title = a_tag.text.strip()
+            link = base_url + a_tag["href"]
+
+            date_str = card.find("span").text.strip()
+            date = datetime.strptime(date_str, "%B %d, %Y")
+
+            categories = card.find_all("li", class_="usa-tag")
+            category = categories[0].text.strip() if categories else None
+
+            # ---- 停止条件 ----
+            if date < start_date:
+                keep_scraping = False
+                break
+
+            data.append({
+                "title": title,
+                "date": date,
+                "category": category,
+                "link": link
+            })
+
+        page += 1
+        time.sleep(1)
+
+    df = pd.DataFrame(data)
+    print(f"Scraped {len(df)} enforcement actions.")
+    return df
+
+df_2024 = scrape_enforcement_actions(2024, 1, RUN_SCRAPER=True)
+
+df_2024.sort_values("date").head(1)
 ```{python}
 
 ```
 
 * c. Test Your Code
+def scrape_enforcement_actions(start_year, start_month, RUN_SCRAPER=False):
+    """
+    Scrape HHS OIG enforcement actions from a given start year/month to today.
+    Step 2c version: saves results to CSV.
+    """
 
+    # ---- 安全开关 ----
+    if not RUN_SCRAPER:
+        print("RUN_SCRAPER is False. Skipping web scraping.")
+        return None
+
+    # ---- 年份检查 ----
+    if start_year < 2013:
+        print("Error: Enforcement Actions are only available from 2013 onward.")
+        return None
+
+    base_url = "https://oig.hhs.gov"
+    data = []
+
+    start_date = datetime(start_year, start_month, 1)
+
+    page = 1
+    keep_scraping = True
+
+    while keep_scraping:
+        print(f"Scraping page {page}...")
+
+        url = f"https://oig.hhs.gov/fraud/enforcement/?page={page}"
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, "lxml")
+
+        cards = soup.find_all("li", class_="usa-card")
+
+        if len(cards) == 0:
+            break
+
+        for card in cards:
+            a_tag = card.find("h2").find("a")
+            title = a_tag.text.strip()
+            link = base_url + a_tag["href"]
+
+            date_str = card.find("span").text.strip()
+            date = datetime.strptime(date_str, "%B %d, %Y")
+
+            categories = card.find_all("li", class_="usa-tag")
+            category = categories[0].text.strip() if categories else None
+
+            # ---- 停止条件 ----
+            if date < start_date:
+                keep_scraping = False
+                break
+
+            data.append({
+                "title": title,
+                "date": date,
+                "category": category,
+                "link": link
+            })
+
+        page += 1
+        time.sleep(1)
+
+    df = pd.DataFrame(data)
+
+    filename = f"enforcement_actions_{start_year}_{start_month}.csv"
+    df.to_csv(filename, index=False)
+
+    print(f"Saved {len(df)} rows to {filename}")
+    return df
+
+df_2022 = scrape_enforcement_actions(2022, 1, RUN_SCRAPER=True)
 ```{python}
 
 ```
@@ -90,7 +291,28 @@ alt.renderers.enable("png")
 ### 1. Plot the number of enforcement actions over time
 
 ```{python}
+monthly_total = (
+    df.groupby("year_month")
+      .size()
+      .reset_index(name="count")
+)
 
+chart_total = (
+    alt.Chart(monthly_total)
+    .mark_line(point=True)
+    .encode(
+        x=alt.X("year_month:T", title="Month"),
+        y=alt.Y("count:Q", title="Number of Enforcement Actions"),
+        tooltip=["year_month:T", "count:Q"]
+    )
+    .properties(
+        title="Monthly Enforcement Actions (Since Jan 2022)",
+        width=650,
+        height=400
+    )
+)
+
+chart_total
 ```
 
 ### 2. Plot the number of enforcement actions categorized:
@@ -99,10 +321,102 @@ alt.renderers.enable("png")
 
 ```{python}
 
+focus_categories = [
+    "Criminal and Civil Actions",
+    "State Enforcement Agencies"
+]
+
+df_two = df[df["category"].isin(focus_categories)]
+df_two["category"].value_counts()
+
+
+# Combine
+
+monthly_two = (
+    df_two
+    .groupby(["year_month", "category"])
+    .size()
+    .reset_index(name="count")
+)
+
+monthly_two.head()
+
+
+chart_two = (
+    alt.Chart(monthly_two)
+    .mark_line(point=True)
+    .encode(
+        x=alt.X("year_month:T", title="Month"),
+        y=alt.Y("count:Q", title="Number of Enforcement Actions"),
+        color=alt.Color("category:N", title="Category"),
+        tooltip=["year_month:T", "category:N", "count:Q"]
+    )
+    .properties(
+        title="Monthly Enforcement Actions by Category (Since Jan 2022)",
+        width=650,
+        height=400
+    )
+)
+
+chart_two
 ```
 
-* based on five topics
 
-```{python}
+
+def classify_criminal_action(title):
+    t = title.lower()
+
+    if any(k in t for k in ["medicare", "medicaid", "health care", "healthcare"]):
+        return "Health Care Fraud"
+
+    elif any(k in t for k in ["bank", "wire fraud", "launder", "financial"]):
+        return "Financial Fraud"
+
+    elif any(k in t for k in ["drug", "opioid", "controlled substance"]):
+        return "Drug Enforcement"
+
+    elif any(k in t for k in ["bribery", "kickback", "corruption"]):
+        return "Bribery / Corruption"
+
+    else:
+        return "Other"
+
+
+df_criminal = df[df["category"] == "Criminal and Civil Actions"].copy()
+
+df_criminal["subtype"] = df_criminal["title"].apply(classify_criminal_action)
+
+df_criminal["subtype"].value_counts()
+
+# Combine
+monthly_criminal = (
+    df_criminal
+    .groupby(["year_month", "subtype"])
+    .size()
+    .reset_index(name="count")
+)
+
+monthly_criminal.head()
+
+chart_criminal = (
+    alt.Chart(monthly_criminal)
+    .mark_line(point=True)
+    .encode(
+        x=alt.X("year_month:T", title="Month"),
+        y=alt.Y("count:Q", title="Number of Actions"),
+        color=alt.Color("subtype:N", title="Criminal Action Type"),
+        tooltip=["year_month:T", "subtype:N", "count:Q"]
+    )
+    .properties(
+        title="Criminal and Civil Actions by Topic (Since Jan 2022)",
+        width=650,
+        height=400
+    )
+)
+
+chart_criminal
+
+* based on five topics
+Figure 3 further disaggregates Criminal and Civil Actions into five topic areas—Health Care Fraud, Financial Fraud, Drug Enforcement, Bribery/Corruption, and Other—based on keyword classification of enforcement action titles. Monthly counts are plotted to illustrate trends across these subcategories over time.
 
 ```
